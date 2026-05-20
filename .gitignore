@@ -13,6 +13,24 @@ target
 # Contains mutation testing data
 **/mutants.out*/
 
+# Node.js
+node_modules/
+dist/
+.env
+.env.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Backend storage
+backend/dev.db
+backend/dev.db-journal
+backend/downloads/*
+backend/temp/*
+!backend/downloads/.gitkeep
+!backend/temp/.gitkeep
+
 # RustRover
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
 #  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
