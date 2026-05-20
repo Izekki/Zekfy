@@ -2,8 +2,8 @@ require('dotenv').config();
 
 const express = require('express');
 
+const rateLimit = require('express-rate-limit');
 const apiRoutes = require('./routes/api');
-const createRateLimiter = require('./middleware/rateLimit');
 
 const app = express();
 
@@ -22,8 +22,14 @@ app.use((req, res, next) => {
 
 const windowMs = Number.parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10);
 const maxRequests = Number.parseInt(process.env.RATE_LIMIT_MAX || '120', 10);
+const limiter = rateLimit({
+  windowMs,
+  max: maxRequests,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
-app.use('/api', createRateLimiter({ windowMs, max: maxRequests }));
+app.use('/api', limiter);
 app.use('/api', apiRoutes);
 
 app.get('/', (_req, res) => {

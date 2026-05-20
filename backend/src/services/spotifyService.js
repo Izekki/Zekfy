@@ -10,6 +10,7 @@ const spotifyApi = new SpotifyWebApi({
 
 let cachedToken = null;
 let tokenExpiresAt = 0;
+const TOKEN_REFRESH_BUFFER_MS = 60_000;
 
 const ensureSpotifyConfig = () => {
   if (!clientId || !clientSecret) {
@@ -22,7 +23,8 @@ const ensureAccessToken = async () => {
   if (!cachedToken || Date.now() >= tokenExpiresAt) {
     const response = await spotifyApi.clientCredentialsGrant();
     cachedToken = response.body.access_token;
-    tokenExpiresAt = Date.now() + response.body.expires_in * 1000 - 60_000;
+    tokenExpiresAt =
+      Date.now() + response.body.expires_in * 1000 - TOKEN_REFRESH_BUFFER_MS;
     spotifyApi.setAccessToken(cachedToken);
   }
   return spotifyApi;

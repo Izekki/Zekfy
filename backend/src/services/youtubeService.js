@@ -15,8 +15,19 @@ const buildYoutubeUrl = (idOrUrl) => {
 };
 
 const getPlaylistTracks = async (playlistUrl) => {
-  const { stdout } = await execFileAsync('yt-dlp', ['-J', '--flat-playlist', playlistUrl]);
-  const payload = JSON.parse(stdout);
+  let payload;
+  try {
+    const { stdout } = await execFileAsync('yt-dlp', [
+      '-J',
+      '--flat-playlist',
+      playlistUrl,
+    ]);
+    payload = JSON.parse(stdout);
+  } catch (error) {
+    throw new Error(
+      'No se pudo obtener la playlist de YouTube. Verifica la URL y la instalación de yt-dlp.',
+    );
+  }
   const entries = Array.isArray(payload.entries) ? payload.entries : [];
 
   const tracks = entries
@@ -35,11 +46,18 @@ const getPlaylistTracks = async (playlistUrl) => {
 };
 
 const searchTrack = async (query) => {
-  const { stdout } = await execFileAsync('yt-dlp', [
-    '--skip-download',
-    '--get-id',
-    `ytsearch1:${query}`,
-  ]);
+  let stdout;
+  try {
+    ({ stdout } = await execFileAsync('yt-dlp', [
+      '--skip-download',
+      '--get-id',
+      `ytsearch1:${query}`,
+    ]));
+  } catch (error) {
+    throw new Error(
+      'No se pudo buscar en YouTube. Verifica la instalación de yt-dlp.',
+    );
+  }
   const id = stdout.trim().split('\n')[0];
   if (!id) {
     throw new Error('No se encontró un resultado en YouTube.');
