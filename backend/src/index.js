@@ -3,6 +3,7 @@ require('dotenv').config();
 const express = require('express');
 
 const apiRoutes = require('./routes/api');
+const createRateLimiter = require('./middleware/rateLimit');
 
 const app = express();
 
@@ -19,6 +20,10 @@ app.use((req, res, next) => {
   return next();
 });
 
+const windowMs = Number.parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10);
+const maxRequests = Number.parseInt(process.env.RATE_LIMIT_MAX || '120', 10);
+
+app.use('/api', createRateLimiter({ windowMs, max: maxRequests }));
 app.use('/api', apiRoutes);
 
 app.get('/', (_req, res) => {

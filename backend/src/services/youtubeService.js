@@ -2,6 +2,7 @@ const { execFile } = require('child_process');
 const { promisify } = require('util');
 
 const execFileAsync = promisify(execFile);
+const { isYoutubeUrl } = require('../utils/url');
 
 const YOUTUBE_VIDEO_PREFIX = 'https://www.youtube.com/watch?v=';
 
@@ -12,9 +13,6 @@ const buildYoutubeUrl = (idOrUrl) => {
   }
   return `${YOUTUBE_VIDEO_PREFIX}${idOrUrl}`;
 };
-
-const isYoutubeUrl = (value) =>
-  value?.includes('youtube.com') || value?.includes('youtu.be');
 
 const getPlaylistTracks = async (playlistUrl) => {
   const { stdout } = await execFileAsync('yt-dlp', ['-J', '--flat-playlist', playlistUrl]);

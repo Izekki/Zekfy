@@ -6,12 +6,13 @@ const prisma = require('../utils/db');
 const { downloadAndConvertToOpus, runWithConcurrency, projectRoot } = require('../services/downloadService');
 const spotifyService = require('../services/spotifyService');
 const youtubeService = require('../services/youtubeService');
+const { isSpotifyUrl, isYoutubeUrl } = require('../utils/url');
 
 const detectSource = (url) => {
-  if (url.includes('spotify.com')) {
+  if (isSpotifyUrl(url)) {
     return 'spotify';
   }
-  if (url.includes('youtube.com') || url.includes('youtu.be')) {
+  if (isYoutubeUrl(url)) {
     return 'youtube';
   }
   return null;
