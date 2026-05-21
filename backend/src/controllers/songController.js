@@ -4,23 +4,27 @@ const path = require('path');
 
 const prisma = require('../utils/db');
 const { downloadAndConvertToOpus, projectRoot } = require('../services/downloadService');
+const { attachSongToPlaylists } = require('../services/playlistLinkService');
 const spotifyService = require('../services/spotifyService');
 const youtubeService = require('../services/youtubeService');
 
 const resolveLocalPath = (relativePath) =>
   path.isAbsolute(relativePath) ? relativePath : path.join(projectRoot, relativePath);
 
-const extractYoutubeId = (url) => {
-  if (!url) return null;
-  if (url.includes('youtu.be/')) {
-    return url.split('youtu.be/')[1]?.split('?')[0] || null;
-  }
-  const match = url.match(/[?&]v=([^&]+)/);
-  return match ? match[1] : null;
-};
+const toPlaylistIds = (value) =>
+  Array.isArray(value)
+    ? [...new Set(value.filter((entry) => typeof entry === 'string' && entry.trim().length > 0))]
+    : [];
 
 const listSongs = async (_req, res) => {
   const songs = await prisma.song.findMany({
+    include: {
+      playlists: {
+        include: {
+          playlist: true,
+        },
+      },
+    },
     orderBy: { createdAt: 'desc' },
   });
   return res.json(songs);
@@ -50,8 +54,113 @@ const streamSong = async (req, res) => {
   return stream.pipe(res);
 };
 
+const resolveTrackPayload = async (payload) => {
+  const { url, title, artist, sourceId, thumbnail } = payload;
+
+  if (url && url.includes('spotify.com/track')) {
+    const spotifyTrack = await spotifyService.getTrackFromUrl(url);
+    const youtubeUrl = await youtubeService.searchTrack(
+      `${spotifyTrack.title} ${spotifyTrack.artist}`,
+    );
+
+    if (!youtubeUrl) {
+      throw new Error('No se encontró resultado en YouTube.');
+    }
+
+    return {
+      source: 'spotify',
+      youtubeUrl,
+      track: {
+        ...spotifyTrack,
+        sourceUrl: youtubeUrl,
+        thumbnail: thumbnail || null,
+      },
+    };
+  }
+
+  if (url && youtubeService.isYoutubeUrl(url)) {
+    const metadata = await youtubeService.getTrackMetadata(url);
+    return {
+      source: 'youtube',
+      youtubeUrl: metadata.url,
+      track: {
+        title: title || metadata.title,
+        artist: artist || metadata.artist,
+        duration: metadata.duration,
+        sourceId: sourceId || metadata.sourceId,
+        sourceUrl: metadata.url,
+        thumbnail: thumbnail || metadata.thumbnail,
+      },
+    };
+  }
+
+  const query = url || `${title || ''} ${artist || ''}`.trim();
+  const [result] = await youtubeService.searchTracks(query, 1);
+  if (!result || !result.url) {
+    throw new Error('No se encontró resultado en YouTube.');
+  }
+  return {
+    source: 'youtube',
+    youtubeUrl: result.url,
+    track: {
+      title: title || result.title,
+      artist: artist || result.artist,
+      duration: result.duration,
+      sourceId: sourceId || result.sourceId,
+      sourceUrl: result.url,
+      thumbnail: thumbnail || result.thumbnail,
+    },
+  };
+};
+
+const resolveInput = async (req, res) => {
+  const { url } = req.body;
+
+  if (!url) {
+    return res.status(400).json({ error: 'Se requiere una URL para resolver datos.' });
+  }
+
+  try {
+    if (url.includes('spotify.com/track')) {
+      const track = await spotifyService.getTrackFromUrl(url);
+      return res.json({
+        source: 'spotify',
+        track,
+      });
+    }
+
+    if (!youtubeService.isYoutubeUrl(url)) {
+      return res.status(400).json({ error: 'La URL debe ser de Spotify o YouTube.' });
+    }
+
+    const track = await youtubeService.getTrackMetadata(url);
+    return res.json({
+      source: 'youtube',
+      track,
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+const searchYoutube = async (req, res) => {
+  const { query, limit } = req.body;
+
+  if (!query || !query.trim()) {
+    return res.status(400).json({ error: 'Escribe una búsqueda para consultar YouTube.' });
+  }
+
+  try {
+    const results = await youtubeService.searchTracks(query.trim(), limit);
+    return res.json({ results });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+};
+
 const downloadSingle = async (req, res) => {
   const { url, title, artist } = req.body;
+  const playlistIds = toPlaylistIds(req.body.playlistIds);
 
   if (!url && !title && !artist) {
     return res.status(400).json({
@@ -60,28 +169,7 @@ const downloadSingle = async (req, res) => {
   }
 
   try {
-    let track = {
-      title: title || 'Unknown track',
-      artist: artist || 'Unknown Artist',
-      duration: 0,
-      sourceId: null,
-    };
-    let youtubeUrl = null;
-    let source = 'youtube';
-
-    if (url && url.includes('spotify.com/track')) {
-      track = await spotifyService.getTrackFromUrl(url);
-      source = 'spotify';
-      youtubeUrl = await youtubeService.searchTrack(
-        `${track.title} ${track.artist}`,
-      );
-    } else if (url && youtubeService.isYoutubeUrl(url)) {
-      youtubeUrl = url;
-      track.sourceId = extractYoutubeId(url);
-    } else {
-      const query = url || `${track.title} ${track.artist}`.trim();
-      youtubeUrl = await youtubeService.searchTrack(query);
-    }
+    const { source, youtubeUrl, track } = await resolveTrackPayload(req.body);
 
     if (!youtubeUrl) {
       throw new Error('No se pudo resolver la URL de YouTube.');
@@ -92,6 +180,7 @@ const downloadSingle = async (req, res) => {
         where: { sourceId: track.sourceId },
       });
       if (existing) {
+        await attachSongToPlaylists(existing.id, playlistIds);
         return res.json({ status: 'existing', song: existing });
       }
     }
@@ -110,10 +199,14 @@ const downloadSingle = async (req, res) => {
         localPath,
         source,
         sourceId: track.sourceId,
+        sourceUrl: track.sourceUrl || youtubeUrl,
+        thumbnail: track.thumbnail,
         sizeBytes: download.sizeBytes,
         bitrate: download.bitrate,
       },
     });
+
+    await attachSongToPlaylists(song.id, playlistIds);
 
     return res.json({ status: 'downloaded', song });
   } catch (error) {
@@ -146,6 +239,8 @@ const deleteSong = async (req, res) => {
 module.exports = {
   listSongs,
   streamSong,
+  resolveInput,
+  searchYoutube,
   downloadSingle,
   deleteSong,
 };

@@ -15,3 +15,41 @@ body {
 * {
   box-sizing: border-box;
 }
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.55);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(129, 140, 248, 0.45);
+  border-radius: 9999px;
+}
+
+.player-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 18px;
+  width: 18px;
+  border-radius: 9999px;
+  background: #a5b4fc;
+  box-shadow: 0 0 18px rgba(129, 140, 248, 0.75);
+}
+
+.player-range::-moz-range-thumb {
+  height: 18px;
+  width: 18px;
+  border: 0;
+  border-radius: 9999px;
+  background: #a5b4fc;
+  box-shadow: 0 0 18px rgba(129, 140, 248, 0.75);
+}
