@@ -4,6 +4,7 @@ const path = require('path');
 
 const prisma = require('../utils/db');
 const { downloadAndConvertToOpus, projectRoot } = require('../services/downloadService');
+const { attachSongToPlaylists } = require('../services/playlistLinkService');
 const spotifyService = require('../services/spotifyService');
 const youtubeService = require('../services/youtubeService');
 
@@ -14,28 +15,6 @@ const toPlaylistIds = (value) =>
   Array.isArray(value)
     ? [...new Set(value.filter((entry) => typeof entry === 'string' && entry.trim().length > 0))]
     : [];
-
-const attachSongToPlaylists = async (songId, playlistIds) => {
-  for (const playlistId of playlistIds) {
-    const existingLink = await prisma.playlistOnSong.findUnique({
-      where: {
-        songId_playlistId: {
-          songId,
-          playlistId,
-        },
-      },
-    });
-
-    if (!existingLink) {
-      await prisma.playlistOnSong.create({
-        data: {
-          songId,
-          playlistId,
-        },
-      });
-    }
-  }
-};
 
 const listSongs = async (_req, res) => {
   const songs = await prisma.song.findMany({

@@ -3,9 +3,13 @@ import axios from 'axios'
 import { Howl } from 'howler'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000'
-const MESSAGE_TIMEOUT_MS = 5000
+const MESSAGE_DISPLAY_DURATION_MS = 5000
 const logoUrl =
   'https://github.com/user-attachments/assets/d493894a-d6e0-4622-8f5d-4674b92c1a9a'
+const WAVEFORM_BAR_COUNT = 30
+const WAVEFORM_MIN_HEIGHT = 14
+const WAVEFORM_HEIGHT_STEP = 9
+const WAVEFORM_HEIGHT_RANGE = 45
 
 const formatDuration = (seconds) => {
   if (!Number.isFinite(seconds) || seconds <= 0) return '0:00'
@@ -20,7 +24,10 @@ const getPlaylistSongs = (playlist) =>
     .filter(Boolean)
     .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
 
-const waveformBars = Array.from({ length: 30 }, (_, index) => 14 + ((index * 9) % 45))
+const waveformBars = Array.from(
+  { length: WAVEFORM_BAR_COUNT },
+  (_, index) => WAVEFORM_MIN_HEIGHT + ((index * WAVEFORM_HEIGHT_STEP) % WAVEFORM_HEIGHT_RANGE),
+)
 
 const SearchIcon = () => (
   <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -76,7 +83,7 @@ function App() {
     if (messageTimeoutRef.current) {
       clearTimeout(messageTimeoutRef.current)
     }
-    messageTimeoutRef.current = setTimeout(() => setMessage(''), MESSAGE_TIMEOUT_MS)
+    messageTimeoutRef.current = setTimeout(() => setMessage(''), MESSAGE_DISPLAY_DURATION_MS)
   }, [])
 
   const loadLibrary = useCallback(async () => {

@@ -29,7 +29,7 @@ const normalizeTrack = (entry = {}) => ({
   title: normalizeText(entry.track || entry.title, 'Unknown track'),
   artist: normalizeText(
     entry.artist || entry.album_artist || entry.creator || entry.uploader || entry.channel,
-    'Unknown Artist',
+    'Unknown artist',
   ),
   duration: Number.isFinite(entry.duration) ? Math.round(entry.duration) : 0,
   sourceId: entry.id || null,

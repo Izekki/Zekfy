@@ -4,6 +4,7 @@ const fs = require('fs-extra');
 
 const prisma = require('../utils/db');
 const { downloadAndConvertToOpus, runWithConcurrency, projectRoot } = require('../services/downloadService');
+const { attachSongToPlaylists } = require('../services/playlistLinkService');
 const spotifyService = require('../services/spotifyService');
 const youtubeService = require('../services/youtubeService');
 const { isSpotifyUrl, isYoutubeUrl } = require('../utils/url');
@@ -32,26 +33,6 @@ const resolveLocalPath = (relativePath) => {
   return path.isAbsolute(relativePath)
     ? relativePath
     : path.join(projectRoot, relativePath);
-};
-
-const ensurePlaylistSongLink = async (playlistId, songId) => {
-  const existingLink = await prisma.playlistOnSong.findUnique({
-    where: {
-      songId_playlistId: {
-        songId,
-        playlistId,
-      },
-    },
-  });
-
-  if (!existingLink) {
-    await prisma.playlistOnSong.create({
-      data: {
-        songId,
-        playlistId,
-      },
-    });
-  }
 };
 
 const includePlaylistSongs = {
@@ -121,7 +102,7 @@ const addSongToPlaylist = async (req, res) => {
       return res.status(404).json({ error: 'Canción no encontrada.' });
     }
 
-    await ensurePlaylistSongLink(playlistId, songId);
+    await attachSongToPlaylists(songId, [playlistId]);
     return res.json({ status: 'linked' });
   } catch (error) {
     return res.status(500).json({ error: error.message });
@@ -195,7 +176,7 @@ const importPlaylist = async (req, res) => {
         if (existing) {
           const existingPath = resolveLocalPath(existing.localPath);
           if (existingPath && (await fs.pathExists(existingPath))) {
-            await ensurePlaylistSongLink(playlist.id, existing.id);
+            await attachSongToPlaylists(existing.id, [playlist.id]);
             return { status: 'skipped', songId: existing.id, title: existing.title };
           }
         }
@@ -221,7 +202,7 @@ const importPlaylist = async (req, res) => {
           },
         });
 
-        await ensurePlaylistSongLink(playlist.id, song.id);
+        await attachSongToPlaylists(song.id, [playlist.id]);
 
         return { status: 'downloaded', songId: song.id, title: song.title };
       },
