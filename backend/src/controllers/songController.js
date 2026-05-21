@@ -96,6 +96,9 @@ const resolveTrackPayload = async (payload) => {
 
   const query = url || `${title || ''} ${artist || ''}`.trim();
   const [result] = await youtubeService.searchTracks(query, 1);
+  if (!result || !result.url) {
+    throw new Error('No se encontró resultado en YouTube.');
+  }
   return {
     source: 'youtube',
     youtubeUrl: result.url,

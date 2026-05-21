@@ -153,6 +153,7 @@ function App() {
   )
 
   const sliderMax = playbackDuration || currentSong?.duration || 0
+  const sliderRangeMax = Math.max(sliderMax, 1)
 
   const selectedResult = useMemo(
     () => searchResults.find((result) => result.url === selectedResultUrl) || null,
@@ -556,7 +557,7 @@ function App() {
                     <input
                       type="range"
                       min="0"
-                      max={sliderMax}
+                      max={sliderRangeMax}
                       step="1"
                       value={Math.min(playbackPosition, sliderMax)}
                       onChange={handleSeek}

@@ -18,6 +18,9 @@ const buildYoutubeUrl = (idOrUrl) => {
 };
 
 const normalizeText = (value, fallback) => {
+  if (value == null) {
+    return fallback;
+  }
   if (typeof value !== 'string') {
     return fallback;
   }
