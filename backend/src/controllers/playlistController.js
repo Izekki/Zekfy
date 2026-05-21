@@ -34,6 +34,100 @@ const resolveLocalPath = (relativePath) => {
     : path.join(projectRoot, relativePath);
 };
 
+const ensurePlaylistSongLink = async (playlistId, songId) => {
+  const existingLink = await prisma.playlistOnSong.findUnique({
+    where: {
+      songId_playlistId: {
+        songId,
+        playlistId,
+      },
+    },
+  });
+
+  if (!existingLink) {
+    await prisma.playlistOnSong.create({
+      data: {
+        songId,
+        playlistId,
+      },
+    });
+  }
+};
+
+const includePlaylistSongs = {
+  songs: {
+    include: {
+      song: true,
+    },
+  },
+};
+
+const listPlaylists = async (_req, res) => {
+  const playlists = await prisma.playlist.findMany({
+    include: includePlaylistSongs,
+    orderBy: { createdAt: 'desc' },
+  });
+
+  return res.json(
+    playlists.map((playlist) => ({
+      ...playlist,
+      songCount: playlist.songs.length,
+    })),
+  );
+};
+
+const createPlaylist = async (req, res) => {
+  const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
+
+  if (!name) {
+    return res.status(400).json({ error: 'El nombre de la playlist es obligatorio.' });
+  }
+
+  try {
+    const playlist = await prisma.playlist.create({
+      data: {
+        name,
+      },
+      include: includePlaylistSongs,
+    });
+
+    return res.status(201).json({
+      ...playlist,
+      songCount: 0,
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+const addSongToPlaylist = async (req, res) => {
+  const { songId } = req.body;
+  const { id: playlistId } = req.params;
+
+  if (!songId) {
+    return res.status(400).json({ error: 'Se requiere el songId.' });
+  }
+
+  try {
+    const [playlist, song] = await Promise.all([
+      prisma.playlist.findUnique({ where: { id: playlistId } }),
+      prisma.song.findUnique({ where: { id: songId } }),
+    ]);
+
+    if (!playlist) {
+      return res.status(404).json({ error: 'Playlist no encontrada.' });
+    }
+    if (!song) {
+      return res.status(404).json({ error: 'Canción no encontrada.' });
+    }
+
+    await ensurePlaylistSongLink(playlistId, songId);
+    return res.json({ status: 'linked' });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+};
+
 const importPlaylist = async (req, res) => {
   const { url } = req.body;
 
@@ -75,12 +169,19 @@ const importPlaylist = async (req, res) => {
           artist: track.artist || 'Unknown Artist',
           duration: track.duration || 0,
           sourceId: track.sourceId || null,
+          sourceUrl: track.url || null,
+          thumbnail: track.thumbnail || null,
         };
 
         let youtubeUrl = track.url;
         if (source === 'spotify') {
-          const query = `${baseData.title} ${baseData.artist}`.trim();
-          youtubeUrl = await youtubeService.searchTrack(query);
+          const [result] = await youtubeService.searchTracks(
+            `${baseData.title} ${baseData.artist}`.trim(),
+            1,
+          );
+          youtubeUrl = result.url;
+          baseData.sourceUrl = result.url;
+          baseData.thumbnail = result.thumbnail;
         }
 
         if (!youtubeUrl) {
@@ -91,12 +192,7 @@ const importPlaylist = async (req, res) => {
         if (existing) {
           const existingPath = resolveLocalPath(existing.localPath);
           if (existingPath && (await fs.pathExists(existingPath))) {
-            await prisma.playlistOnSong.create({
-              data: {
-                songId: existing.id,
-                playlistId: playlist.id,
-              },
-            });
+            await ensurePlaylistSongLink(playlist.id, existing.id);
             return { status: 'skipped', songId: existing.id, title: existing.title };
           }
         }
@@ -115,17 +211,14 @@ const importPlaylist = async (req, res) => {
             localPath,
             source,
             sourceId: baseData.sourceId,
+            sourceUrl: baseData.sourceUrl || youtubeUrl,
+            thumbnail: baseData.thumbnail,
             sizeBytes: download.sizeBytes,
             bitrate: download.bitrate,
           },
         });
 
-        await prisma.playlistOnSong.create({
-          data: {
-            songId: song.id,
-            playlistId: playlist.id,
-          },
-        });
+        await ensurePlaylistSongLink(playlist.id, song.id);
 
         return { status: 'downloaded', songId: song.id, title: song.title };
       },
@@ -169,5 +262,8 @@ const importPlaylist = async (req, res) => {
 };
 
 module.exports = {
+  listPlaylists,
+  createPlaylist,
+  addSongToPlaylist,
   importPlaylist,
 };

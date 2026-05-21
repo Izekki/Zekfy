@@ -14,6 +14,26 @@ const buildYoutubeUrl = (idOrUrl) => {
   return `${YOUTUBE_VIDEO_PREFIX}${idOrUrl}`;
 };
 
+const sanitizeText = (value, fallback) => {
+  if (typeof value !== 'string') {
+    return fallback;
+  }
+  const trimmed = value.trim();
+  return trimmed || fallback;
+};
+
+const normalizeTrack = (entry = {}) => ({
+  title: sanitizeText(entry.track || entry.title, 'Unknown track'),
+  artist: sanitizeText(
+    entry.artist || entry.album_artist || entry.creator || entry.uploader || entry.channel,
+    'Unknown Artist',
+  ),
+  duration: Number.isFinite(entry.duration) ? Math.round(entry.duration) : 0,
+  sourceId: entry.id || null,
+  url: buildYoutubeUrl(entry.webpage_url || entry.original_url || entry.url || entry.id),
+  thumbnail: entry.thumbnail || null,
+});
+
 const getPlaylistTracks = async (playlistUrl) => {
   let payload;
   try {
@@ -31,12 +51,7 @@ const getPlaylistTracks = async (playlistUrl) => {
   const entries = Array.isArray(payload.entries) ? payload.entries : [];
 
   const tracks = entries
-    .map((entry) => ({
-      title: entry.title || entry.id || 'Unknown track',
-      url: buildYoutubeUrl(entry.url || entry.id),
-      sourceId: entry.id || null,
-      duration: entry.duration || null,
-    }))
+    .map((entry) => normalizeTrack(entry))
     .filter((track) => Boolean(track.url));
 
   return {
@@ -45,28 +60,64 @@ const getPlaylistTracks = async (playlistUrl) => {
   };
 };
 
-const searchTrack = async (query) => {
-  let stdout;
+const getTrackMetadata = async (videoUrl) => {
+  let payload;
   try {
-    ({ stdout } = await execFileAsync('yt-dlp', [
+    const { stdout } = await execFileAsync('yt-dlp', [
+      '-J',
+      '--no-playlist',
       '--skip-download',
-      '--get-id',
-      `ytsearch1:${query}`,
-    ]));
+      videoUrl,
+    ]);
+    payload = JSON.parse(stdout);
+  } catch (error) {
+    throw new Error(
+      'No se pudo leer la URL de YouTube. Verifica la URL y la instalación de yt-dlp.',
+    );
+  }
+  const track = normalizeTrack(payload);
+  if (!track.url) {
+    throw new Error('No se pudo resolver la canción desde YouTube.');
+  }
+  return track;
+};
+
+const searchTracks = async (query, limit = 5) => {
+  let payload;
+  const safeLimit = Math.min(Math.max(Number(limit) || 5, 1), 10);
+  try {
+    const { stdout } = await execFileAsync('yt-dlp', [
+      '-J',
+      '--flat-playlist',
+      `ytsearch${safeLimit}:${query}`,
+    ]);
+    payload = JSON.parse(stdout);
   } catch (error) {
     throw new Error(
       'No se pudo buscar en YouTube. Verifica la instalación de yt-dlp.',
     );
   }
-  const id = stdout.trim().split('\n')[0];
-  if (!id) {
-    throw new Error('No se encontró un resultado en YouTube.');
+
+  const results = Array.isArray(payload.entries)
+    ? payload.entries.map((entry) => normalizeTrack(entry)).filter((track) => Boolean(track.url))
+    : [];
+
+  if (results.length === 0) {
+    throw new Error('No se encontraron resultados en YouTube.');
   }
-  return buildYoutubeUrl(id);
+
+  return results;
+};
+
+const searchTrack = async (query) => {
+  const [result] = await searchTracks(query, 1);
+  return result?.url || null;
 };
 
 module.exports = {
   getPlaylistTracks,
+  getTrackMetadata,
+  searchTracks,
   searchTrack,
   isYoutubeUrl,
 };
