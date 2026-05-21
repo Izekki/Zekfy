@@ -3,6 +3,7 @@ import axios from 'axios'
 import { Howl } from 'howler'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+const MESSAGE_TIMEOUT_MS = 5000
 const logoUrl =
   'https://github.com/user-attachments/assets/d493894a-d6e0-4622-8f5d-4674b92c1a9a'
 
@@ -75,7 +76,7 @@ function App() {
     if (messageTimeoutRef.current) {
       clearTimeout(messageTimeoutRef.current)
     }
-    messageTimeoutRef.current = setTimeout(() => setMessage(''), 5000)
+    messageTimeoutRef.current = setTimeout(() => setMessage(''), MESSAGE_TIMEOUT_MS)
   }, [])
 
   const loadLibrary = useCallback(async () => {
@@ -378,8 +379,8 @@ function App() {
           <div className="flex items-center gap-4">
             <img src={logoUrl} alt="Zekfy logo" className="h-20 w-20 rounded-3xl object-cover shadow-2xl" />
             <div>
-              <p className="text-4xl font-semibold tracking-tight text-white">Aurora</p>
-              <p className="text-2xl text-indigo-300">Tu música, tu mundo.</p>
+              <p className="text-4xl font-semibold tracking-tight text-white">Zekfy</p>
+              <p className="text-2xl text-indigo-300">Aurora edition · Tu música, tu mundo.</p>
             </div>
           </div>
 

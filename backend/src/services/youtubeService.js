@@ -5,6 +5,9 @@ const execFileAsync = promisify(execFile);
 const { isYoutubeUrl } = require('../utils/url');
 
 const YOUTUBE_VIDEO_PREFIX = 'https://www.youtube.com/watch?v=';
+const DEFAULT_SEARCH_LIMIT = 5;
+const MIN_SEARCH_LIMIT = 1;
+const MAX_SEARCH_LIMIT = 10;
 
 const buildYoutubeUrl = (idOrUrl) => {
   if (!idOrUrl) return null;
@@ -82,9 +85,12 @@ const getTrackMetadata = async (videoUrl) => {
   return track;
 };
 
-const searchTracks = async (query, limit = 5) => {
+const searchTracks = async (query, limit = DEFAULT_SEARCH_LIMIT) => {
   let payload;
-  const safeLimit = Math.min(Math.max(Number(limit) || 5, 1), 10);
+  const safeLimit = Math.min(
+    Math.max(Number(limit) || DEFAULT_SEARCH_LIMIT, MIN_SEARCH_LIMIT),
+    MAX_SEARCH_LIMIT,
+  );
   try {
     const { stdout } = await execFileAsync('yt-dlp', [
       '-J',
@@ -110,7 +116,7 @@ const searchTracks = async (query, limit = 5) => {
 };
 
 const searchTrack = async (query) => {
-  const [result] = await searchTracks(query, 1);
+  const [result] = await searchTracks(query, MIN_SEARCH_LIMIT);
   return result.url;
 };
 
