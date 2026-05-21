@@ -14,7 +14,7 @@ const buildYoutubeUrl = (idOrUrl) => {
   return `${YOUTUBE_VIDEO_PREFIX}${idOrUrl}`;
 };
 
-const sanitizeText = (value, fallback) => {
+const normalizeText = (value, fallback) => {
   if (typeof value !== 'string') {
     return fallback;
   }
@@ -23,8 +23,8 @@ const sanitizeText = (value, fallback) => {
 };
 
 const normalizeTrack = (entry = {}) => ({
-  title: sanitizeText(entry.track || entry.title, 'Unknown track'),
-  artist: sanitizeText(
+  title: normalizeText(entry.track || entry.title, 'Unknown track'),
+  artist: normalizeText(
     entry.artist || entry.album_artist || entry.creator || entry.uploader || entry.channel,
     'Unknown Artist',
   ),
@@ -111,7 +111,7 @@ const searchTracks = async (query, limit = 5) => {
 
 const searchTrack = async (query) => {
   const [result] = await searchTracks(query, 1);
-  return result?.url || null;
+  return result.url;
 };
 
 module.exports = {

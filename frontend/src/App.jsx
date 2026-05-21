@@ -7,9 +7,9 @@ const logoUrl =
   'https://github.com/user-attachments/assets/d493894a-d6e0-4622-8f5d-4674b92c1a9a'
 
 const formatDuration = (seconds) => {
-  if (!seconds) return '0:00'
+  if (!Number.isFinite(seconds) || seconds <= 0) return '0:00'
   const mins = Math.floor(seconds / 60)
-  const secs = `${Math.max(0, Math.floor(seconds % 60))}`.padStart(2, '0')
+  const secs = `${Math.floor(seconds % 60)}`.padStart(2, '0')
   return `${mins}:${secs}`
 }
 
@@ -143,6 +143,8 @@ function App() {
     () => songs.find((song) => song.id === currentSongId) || displayedSongs[0] || null,
     [currentSongId, displayedSongs, songs],
   )
+
+  const sliderMax = playbackDuration || currentSong?.duration || 0
 
   const selectedResult = useMemo(
     () => searchResults.find((result) => result.url === selectedResultUrl) || null,
@@ -546,9 +548,9 @@ function App() {
                     <input
                       type="range"
                       min="0"
-                      max={playbackDuration || currentSong?.duration || 0}
+                      max={sliderMax}
                       step="1"
-                      value={Math.min(playbackPosition, playbackDuration || currentSong?.duration || 0)}
+                      value={Math.min(playbackPosition, sliderMax)}
                       onChange={handleSeek}
                       className="player-range h-2 w-full cursor-pointer appearance-none rounded-full bg-white/10"
                     />

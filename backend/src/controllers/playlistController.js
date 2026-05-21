@@ -179,6 +179,9 @@ const importPlaylist = async (req, res) => {
             `${baseData.title} ${baseData.artist}`.trim(),
             1,
           );
+          if (!result || !result.url) {
+            throw new Error('No se encontró resultado en YouTube.');
+          }
           youtubeUrl = result.url;
           baseData.sourceUrl = result.url;
           baseData.thumbnail = result.thumbnail;

@@ -12,7 +12,7 @@ const resolveLocalPath = (relativePath) =>
 
 const toPlaylistIds = (value) =>
   Array.isArray(value)
-    ? [...new Set(value.filter((entry) => typeof entry === 'string' && entry.trim()))]
+    ? [...new Set(value.filter((entry) => typeof entry === 'string' && entry.trim().length > 0))]
     : [];
 
 const attachSongToPlaylists = async (songId, playlistIds) => {
@@ -83,6 +83,10 @@ const resolveTrackPayload = async (payload) => {
     const youtubeUrl = await youtubeService.searchTrack(
       `${spotifyTrack.title} ${spotifyTrack.artist}`,
     );
+
+    if (!youtubeUrl) {
+      throw new Error('No se encontró resultado en YouTube.');
+    }
 
     return {
       source: 'spotify',
@@ -184,6 +188,10 @@ const downloadSingle = async (req, res) => {
 
   try {
     const { source, youtubeUrl, track } = await resolveTrackPayload(req.body);
+
+    if (!youtubeUrl) {
+      throw new Error('No se pudo resolver la URL de YouTube.');
+    }
 
     if (track.sourceId) {
       const existing = await prisma.song.findFirst({
